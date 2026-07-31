@@ -32,14 +32,16 @@ identity, context, and ordered event stream. Normative Rust types:
   "timestamp": "2026-07-31T12:00:00Z",
   "links": {},
   "blocks": [{ "type": "text", "text": "Hello." }],
-  "metadata": {}
+  "metadata": {},
+  "tags": [],
+  "extensions": {}
 }
 ```
 
 | Field | Required |
 | --- | --- |
 | `id`, `kind`, `role`, `timestamp`, `metadata` | yes |
-| `links`, `blocks` | no |
+| `links`, `blocks`, `tags`, `extensions` | no |
 
 **Kinds:** `message`, `action`, `observation`, `lifecycle`, `other`.
 

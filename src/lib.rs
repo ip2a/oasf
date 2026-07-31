@@ -79,6 +79,10 @@ pub struct Event {
     #[serde(default)]
     pub blocks: Vec<Block>,
     pub metadata: Metadata,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub extensions: BTreeMap<String, Value>,
 }
 
 /// Coarse event category; specific payload lives in [`Block`]s.
