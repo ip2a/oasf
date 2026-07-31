@@ -1,6 +1,6 @@
 [package]
 name = "oasf"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2021"
 authors = ["oasf contributors"]
 description = "Open Agent Session Format — a vendor-neutral schema for AI agent session transcripts"
