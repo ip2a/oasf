@@ -3,14 +3,14 @@
 
 <p align="center">
 Vendor-neutral JSON for an AI agent session.<br>
-Crate <code>0.1.2</code> · schema <code>oasf</code> v1
+Crate <code>0.2.0</code> · schema <code>oasf</code> v2
 </p>
 
 ## Install
 
 ```toml
 [dependencies]
-oasf = "0.1.2"
+oasf = "0.2.0"
 chrono = "0.4"
 serde_json = "1"
 ```
@@ -23,6 +23,7 @@ use oasf::{Block, Event, EventKind, Identity, Metadata, Role, Schema, Session};
 let session = Session {
     schema: Schema::default(),
     identity: Identity { id: "01J…".into(), title: None },
+    lineage: vec![],
     context: Default::default(),
     events: vec![Event {
         id: "evt_1".into(),
@@ -39,4 +40,4 @@ let session = Session {
 println!("{}", serde_json::to_string_pretty(&session).unwrap());
 ```
 
-Format details: [`SPEC.md`](SPEC.md). License: Apache-2.0.
+Format details: [`SPEC.md`](SPEC.md). Migrating from schema v1: [`MIGRATION.md`](MIGRATION.md). License: Apache-2.0.

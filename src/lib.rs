@@ -14,7 +14,7 @@ use std::collections::BTreeMap;
 pub const OASF_SCHEMA_NAME: &str = "oasf";
 
 /// Current OASF schema version (single incrementing integer; see SPEC §13).
-pub const OASF_SCHEMA_VERSION: u32 = 1;
+pub const OASF_SCHEMA_VERSION: u32 = 2;
 
 /// Schema name and version a session conforms to.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -38,6 +38,8 @@ pub struct Session {
     #[serde(default)]
     pub schema: Schema,
     pub identity: Identity,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lineage: Vec<SessionRelation>,
     #[serde(default)]
     pub context: Context,
     #[serde(default)]
@@ -52,6 +54,26 @@ pub struct Identity {
     pub id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
+}
+
+/// Typed relationship between this session and another session.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum SessionRelation {
+    /// This session branched from the source session's history.
+    ForkedFrom {
+        session_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        at_event_id: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        at_turn_id: Option<String>,
+    },
+    /// This session was spawned as a delegated child session.
+    SpawnedBy {
+        session_id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        at_tool_call_id: Option<String>,
+    },
 }
 
 /// Optional ambient context: workspace, timing, tags.
@@ -157,6 +179,18 @@ pub struct Usage {
     pub reasoning_tokens: Option<u64>,
 }
 
+/// Terminal result of a tool execution.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionOutcome {
+    Succeeded,
+    Failed,
+    Cancelled,
+    Declined,
+    TimedOut,
+    Unknown,
+}
+
 /// Typed content fragment within an event. Discriminated by `type`.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type", rename_all = "snake_case")]
@@ -178,8 +212,7 @@ pub enum Block {
     ToolResult {
         tool_call_id: String,
         content: String,
-        #[serde(default)]
-        is_error: bool,
+        outcome: ExecutionOutcome,
     },
     Patch {
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -192,15 +225,17 @@ pub enum Block {
         hash: Option<String>,
     },
     Command {
+        command_id: String,
         command: String,
         #[serde(default, skip_serializing_if = "Vec::is_empty")]
         argv: Vec<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         cwd: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tool_call_id: Option<String>,
     },
     CommandResult {
-        #[serde(skip_serializing_if = "Option::is_none")]
-        command: Option<String>,
+        command_id: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         exit_code: Option<i32>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -230,4 +265,73 @@ pub enum Block {
     Other {
         raw: Value,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn execution_blocks_round_trip_with_stable_ids_and_outcome() {
+        let blocks = vec![
+            Block::ToolResult {
+                tool_call_id: "call_1".into(),
+                content: "ok".into(),
+                outcome: ExecutionOutcome::Succeeded,
+            },
+            Block::Command {
+                command_id: "cmd_1".into(),
+                command: "git status".into(),
+                argv: vec![],
+                cwd: Some("/workspace".into()),
+                tool_call_id: Some("call_1".into()),
+            },
+            Block::CommandResult {
+                command_id: "cmd_1".into(),
+                exit_code: Some(0),
+                stdout: Some("clean".into()),
+                stderr: None,
+            },
+        ];
+
+        let json = serde_json::to_string(&blocks).unwrap();
+        let decoded: Vec<Block> = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(decoded, blocks);
+        assert!(json.contains("\"command_id\":\"cmd_1\""));
+        assert!(json.contains("\"outcome\":\"succeeded\""));
+    }
+
+    #[test]
+    fn session_lineage_round_trip_preserves_relation_kinds_and_boundaries() {
+        let session = Session {
+            schema: Schema::default(),
+            identity: Identity {
+                id: "sess_child".into(),
+                title: None,
+            },
+            lineage: vec![
+                SessionRelation::ForkedFrom {
+                    session_id: "sess_parent".into(),
+                    at_event_id: Some("evt_12".into()),
+                    at_turn_id: Some("turn_4".into()),
+                },
+                SessionRelation::SpawnedBy {
+                    session_id: "sess_parent".into(),
+                    at_tool_call_id: Some("call_7".into()),
+                },
+            ],
+            context: Context::default(),
+            events: vec![],
+            extensions: BTreeMap::new(),
+        };
+
+        let json = serde_json::to_string(&session).unwrap();
+        let decoded: Session = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(decoded, session);
+        assert!(json.contains("\"lineage\""));
+        assert!(json.contains("forked_from"));
+        assert!(json.contains("spawned_by"));
+    }
 }
