@@ -1,0 +1,23 @@
+# Ignore everything by default; whitelist only repository content below.
+*
+
+# Repository metadata and public documentation.
+!/.gitignore
+!/Cargo.toml
+!/README.md
+!/SPEC.md
+!/MIGRATION.md
+!/LICENSE
+
+# Tracked source, CI, and project automation.
+!/.github/
+!/.github/**
+!/src/
+!/src/**
+
+# Local research and generated/build files remain ignored.
+/.local/
+/target/
+/Cargo.lock
+/run_debug.sh
+/scripts/
